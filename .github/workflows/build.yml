@@ -10,11 +10,10 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      # Gradle 8.7 use korbo - 9.8.1 na
-      - name: Setup Gradle 8.7
+      - name: Setup Gradle 8.9
         uses: gradle/actions/setup-gradle@v3
         with:
-          gradle-version: 8.7
+          gradle-version: 8.9
 
       - name: Fix Project Structure
         run: |
@@ -22,16 +21,12 @@ jobs:
           mkdir -p app/src/main
           mv MainActivity.kt app/src/main/java/com/example/oceantheme2/ || true
           mv AndroidManifest.xml app/src/main/ || true
-
-          # Root build file - sudhu plugin declaration, version soho
           cat > build.gradle.kts <<'EOF'
           plugins {
               id("com.android.application") version "8.7.3" apply false
               id("org.jetbrains.kotlin.android") version "2.0.21" apply false
           }
           EOF
-
-          # App build file - Copilot er ta
           cat > app/build.gradle.kts <<'EOF'
           plugins {
               id("com.android.application")
@@ -65,8 +60,6 @@ jobs:
               implementation("com.google.android.material:material:1.12.0")
           }
           EOF
-
-          # Settings file thik kora
           cat > settings.gradle.kts <<'EOF'
           pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
           dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
