@@ -42,17 +42,13 @@ jobs:
                   versionName = "1.0"
               }
               buildTypes {
-                  release {
-                      isMinifyEnabled = false
-                  }
+                  release { isMinifyEnabled = false }
               }
               compileOptions {
                   sourceCompatibility = JavaVersion.VERSION_17
                   targetCompatibility = JavaVersion.VERSION_17
               }
-              kotlinOptions {
-                  jvmTarget = "17"
-              }
+              kotlinOptions { jvmTarget = "17" }
           }
           dependencies {
               implementation("androidx.core:core-ktx:1.13.1")
@@ -61,68 +57,94 @@ jobs:
           }
           EOF
           cat > settings.gradle.kts <<'EOF'
-          pluginManagement {
-              repositories {
-                  google()
-                  mavenCentral()
-                  gradlePluginPortal()
-              }
-          }
-          dependencyResolutionManagement {
-              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-          }
+          pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
+          dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
           rootProject.name = "OceanTheme2"
           include(":app")
+          EOF
+          cat > app/src/main/java/com/example/oceantheme2/WaterView.kt <<'EOF'
+          package com.example.oceantheme2
+          import android.content.Context
+          import android.graphics.*
+          import android.util.AttributeSet
+          import android.view.View
+          import kotlin.math.sin
+          import kotlin.random.Random
+          class WaterView @JvmOverloads constructor(ctx: Context, attrs: AttributeSet? = null) : View(ctx, attrs) {
+              var tiltX = 0f; var tiltY = 0f; var shake = 0f
+              private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+              private val bubblePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+              private var time = 0f
+              private data class Bubble(var x: Float, var y: Float, var r: Float, var s: Float)
+              private val bubbles = List(14) { Bubble(Random.nextFloat(), Random.nextFloat(), Random.nextFloat()*14f+5f, Random.nextFloat()*1.5f+0.5f) }
+              fun updateTilt(x: Float, y: Float, s: Float) { tiltX = x; tiltY = y; shake = s; invalidate() }
+              override fun onDraw(c: Canvas) {
+                  super.onDraw(c); time += 0.08f
+                  val w = width.toFloat(); val h = height.toFloat()
+                  val baseY = h * 0.62f + tiltY * h * 0.18f
+                  val path = Path(); path.moveTo(0f, baseY)
+                  for (i in 0..20) { val x = w * i / 20f; val y = baseY + sin(time + i*0.7f + tiltX*2f) * (8f + shake*6f); path.lineTo(x, y) }
+                  path.lineTo(w, h); path.lineTo(0f, h); path.close()
+                  val grad = LinearGradient(0f, baseY, 0f, h, Color.parseColor("#33B7E8"), Color.parseColor("#0A6DBA"), Shader.TileMode.CLAMP)
+                  paint.shader = grad; paint.alpha = 210; c.drawPath(path, paint); paint.shader = null
+                  bubblePaint.style = Paint.Style.STROKE; bubblePaint.strokeWidth = 2f; bubblePaint.color = Color.parseColor("#99FFFFFF")
+                  for (b in bubbles) { var by = (b.y * h - time * b.s * 12f) % h; if (by < 0) by += h; c.drawCircle(b.x * w + tiltX*18f, by, b.r, bubblePaint); bubblePaint.style = Paint.Style.FILL; bubblePaint.alpha = 90; c.drawCircle(b.x * w + tiltX*18f, by, b.r*0.5f, bubblePaint); bubblePaint.style = Paint.Style.STROKE; bubblePaint.alpha = 255 }
+              }
+          }
           EOF
           cat > app/src/main/java/com/example/oceantheme2/MainActivity.kt <<'EOF'
           package com.example.oceantheme2
           import android.app.Activity
-          import android.os.Bundle
-          import android.widget.LinearLayout
-          import android.widget.TextView
-          import android.widget.Button
+          import android.content.Intent
+          import android.content.pm.PackageManager
           import android.graphics.Color
+          import android.graphics.drawable.GradientDrawable
+          import android.hardware.Sensor
+          import android.hardware.SensorEvent
+          import android.hardware.SensorEventListener
+          import android.hardware.SensorManager
+          import android.os.Bundle
           import android.view.Gravity
-          class MainActivity : Activity() {
+          import android.widget.*
+          import java.text.SimpleDateFormat
+          import java.util.*
+          class MainActivity : Activity(), SensorEventListener {
+              private lateinit var sm: SensorManager
+              private val waterViews = mutableListOf<WaterView>()
+              private var lastShake = 0L
               override fun onCreate(savedInstanceState: Bundle?) {
                   super.onCreate(savedInstanceState)
-                  val layout = LinearLayout(this)
-                  layout.orientation = LinearLayout.VERTICAL
-                  layout.setBackgroundColor(Color.parseColor("#062A4D"))
-                  layout.setPadding(40, 80, 40, 40)
-                  layout.gravity = Gravity.CENTER_HORIZONTAL
-                  val title = TextView(this)
-                  title.text = "Dark Glass Water"
-                  title.textSize = 28f
-                  title.setTextColor(Color.WHITE)
-                  title.gravity = Gravity.CENTER
-                  val sub = TextView(this)
-                  sub.text = "OceanTheme2 - Tour UI"
-                  sub.textSize = 14f
-                  sub.setTextColor(Color.parseColor("#7DD3FC"))
-                  sub.gravity = Gravity.CENTER
-                  sub.setPadding(0, 10, 0, 40)
-                  val card = TextView(this)
-                  card.text = "Glass Card\n\nOcean - Glass - Water"
-                  card.textSize = 20f
-                  card.setTextColor(Color.WHITE)
-                  card.setBackgroundColor(Color.parseColor("#1E4A6B"))
-                  card.setPadding(50, 50, 50, 50)
-                  card.gravity = Gravity.CENTER
-                  layout.addView(title)
-                  layout.addView(sub)
-                  layout.addView(card)
-                  val btn = Button(this)
-                  btn.text = "Explore Tour"
-                  btn.setBackgroundColor(Color.parseColor("#0EA5E9"))
-                  btn.setTextColor(Color.WHITE)
-                  layout.addView(btn)
-                  setContentView(layout)
+                  sm = getSystemService(SENSOR_SERVICE) as SensorManager
+                  val scroll = ScrollView(this)
+                  val root = LinearLayout(this); root.orientation = LinearLayout.VERTICAL; root.setBackgroundColor(Color.parseColor("#010D1E")); root.setPadding(28, 40, 28, 28)
+                  val timeTv = TextView(this); timeTv.text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date()); timeTv.textSize = 42f; timeTv.setTextColor(Color.parseColor("#00CFFF")); timeTv.setTypeface(null, android.graphics.Typeface.BOLD); timeTv.gravity = Gravity.CENTER
+                  val dateTv = TextView(this); dateTv.text = "Chittagong  •  28°C Partly Cloudy"; dateTv.textSize = 13f; dateTv.setTextColor(Color.parseColor("#7DD3FC")); dateTv.gravity = Gravity.CENTER; dateTv.setPadding(0, 4, 0, 24)
+                  root.addView(timeTv); root.addView(dateTv)
+                  val apps = listOf("【entity-WhatsApp¦canonical_name=WhatsApp】" to "#22C55E", "YouTube" to "#FF0000", "Chrome" to "#FFC107", "Gallery" to "#A855F7", "Phone" to "#0EA5E9", "Camera" to "#EC4899", "Settings" to "#06B6D4", "Play Store" to "#22C55E")
+                  val grid = GridLayout(this); grid.columnCount = 4; grid.rowCount = 2
+                  for ((name, col) in apps) {
+                      val cell = LinearLayout(this); cell.orientation = LinearLayout.VERTICAL; cell.gravity = Gravity.CENTER; cell.setPadding(10, 10, 10, 10)
+                      val frame = FrameLayout(this)
+                      val cube = FrameLayout(this); val lp = FrameLayout.LayoutParams(150, 150); cube.layoutParams = lp
+                      val bg = GradientDrawable(); bg.cornerRadius = 36f; bg.setColor(Color.parseColor("#22FFFFFF")); bg.setStroke(2, Color.parseColor(col)); cube.background = bg
+                      val wv = WaterView(this); wv.layoutParams = FrameLayout.LayoutParams(150, 150); waterViews.add(wv)
+                      val icon = TextView(this); icon.text = name.take(1); icon.textSize = 30f; icon.setTextColor(Color.parseColor(col)); icon.setTypeface(null, android.graphics.Typeface.BOLD); icon.gravity = Gravity.CENTER; val ilp = FrameLayout.LayoutParams(150, 150); icon.layoutParams = ilp
+                      cube.addView(wv); cube.addView(icon); frame.addView(cube)
+                      val label = TextView(this); label.text = name; label.textSize = 11f; label.setTextColor(Color.WHITE); label.gravity = Gravity.CENTER; label.setPadding(0, 8, 0, 0)
+                      cell.addView(frame); cell.addView(label); cell.setOnClickListener { launchApp(name) }; grid.addView(cell)
+                  }
+                  root.addView(grid); scroll.addView(root); setContentView(scroll)
               }
+              private fun launchApp(name: String) {
+                  val pm = packageManager
+                  val map = mapOf("【entity-WhatsApp¦canonical_name=WhatsApp】" to "com.【entity-whatsapp¦canonical_name=WhatsApp】", "YouTube" to "com.google.android.youtube", "Chrome" to "com.android.chrome", "Gallery" to "com.google.android.apps.photos", "Phone" to "com.google.android.dialer", "Camera" to "com.android.camera", "Settings" to "com.android.settings", "Play Store" to "com.android.vending")
+                  val pkg = map[name] ?: return
+                  val i = pm.getLaunchIntentForPackage(pkg); if (i != null) startActivity(i) else Toast.makeText(this, "$name not installed", Toast.LENGTH_SHORT).show()
+              }
+              override fun onResume() { super.onResume(); sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.let { sm.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME) } }
+              override fun onPause() { super.onPause(); sm.unregisterListener(this) }
+              override fun onSensorChanged(e: SensorEvent?) { if (e?.sensor?.type != Sensor.TYPE_ACCELEROMETER) return; val tx = e.values[0] / 9.81f; val ty = e.values[1] / 9.81f; val shakeVal = (kotlin.math.abs(e.values[0]) + kotlin.math.abs(e.values[1])) / 20f; for (v in waterViews) v.updateTilt(-tx, ty, shakeVal.coerceIn(0f, 1f)) }
+              override fun onAccuracyChanged(s: Sensor?, a: Int) {}
           }
           EOF
           cat > app/src/main/AndroidManifest.xml <<'EOF'
@@ -132,6 +154,8 @@ jobs:
                   <activity android:name=".MainActivity" android:exported="true">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.HOME" />
+                          <category android:name="android.intent.category.DEFAULT" />
                           <category android:name="android.intent.category.LAUNCHER" />
                       </intent-filter>
                   </activity>
