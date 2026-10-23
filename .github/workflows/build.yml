@@ -12,9 +12,6 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
@@ -27,4 +24,3 @@ jobs:
           name: OceanTheme2-APK
           path: |
             **/build/outputs/apk/debug/*.apk
-            app/build/outputs/apk/debug/*.apk
