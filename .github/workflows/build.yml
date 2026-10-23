@@ -105,7 +105,7 @@ jobs:
                   sub.textSize = 14f
                   sub.setTextColor(Color.parseColor("#7DD3FC"))
                   sub.gravity = Gravity.CENTER
-                  sub.setPadding(0, 10, 0, 40, 0)
+                  sub.setPadding(0, 10, 0, 40)
                   val card = TextView(this)
                   card.text = "Glass Card\n\nOcean - Glass - Water"
                   card.textSize = 20f
