@@ -9,12 +9,10 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-
       - name: Setup Gradle 8.9
         uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: 8.9
-
       - name: Fix Project Structure
         run: |
           mkdir -p app/src/main/java/com/example/oceantheme2
@@ -28,30 +26,13 @@ jobs:
           }
           EOF
           cat > app/build.gradle.kts <<'EOF'
-          plugins {
-              id("com.android.application")
-              id("org.jetbrains.kotlin.android")
-          }
+          plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
           android {
               namespace = "com.example.oceantheme2"
               compileSdk = 34
-              defaultConfig {
-                  applicationId = "com.example.oceantheme2"
-                  minSdk = 24
-                  targetSdk = 34
-                  versionCode = 1
-                  versionName = "1.0"
-              }
-              buildTypes {
-                  release {
-                      isMinifyEnabled = false
-                      proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-                  }
-              }
-              compileOptions {
-                  sourceCompatibility = JavaVersion.VERSION_17
-                  targetCompatibility = JavaVersion.VERSION_17
-              }
+              defaultConfig { applicationId = "com.example.oceantheme2"; minSdk = 24; targetSdk = 34; versionCode = 1; versionName = "1.0" }
+              buildTypes { release { isMinifyEnabled = false } }
+              compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
               kotlinOptions { jvmTarget = "17" }
           }
           dependencies {
@@ -66,10 +47,44 @@ jobs:
           rootProject.name = "OceanTheme2"
           include(":app")
           EOF
-
+          # --- CRASH FIX START ---
+          # MainActivity ke simple TextView diye overwrite kora, kono XML theme lagbe na
+          cat > app/src/main/java/com/example/oceantheme2/MainActivity.kt <<'EOF'
+          package com.example.oceantheme2
+          import android.app.Activity
+          import android.os.Bundle
+          import android.widget.TextView
+          import android.graphics.Color
+          class MainActivity : Activity() {
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
+                  val tv = TextView(this)
+                  tv.text = "OceanTheme2 - Dark Glass Water\nApp Successfully Launched!"
+                  tv.textSize = 22f
+                  tv.setTextColor(Color.WHITE)
+                  tv.setBackgroundColor(Color.parseColor("#0A2A43"))
+                  tv.setPadding(50, 100, 50, 100)
+                  setContentView(tv)
+              }
+          }
+          EOF
+          # Manifest ke safe system theme diye overwrite
+          cat > app/src/main/AndroidManifest.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <application android:label="Dark Glass Water" android:theme="@android:style/Theme.Material.Light.NoActionBar">
+                  <activity android:name=".MainActivity" android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF
+          # --- CRASH FIX END ---
       - name: Build Debug APK
         run: gradle assembleDebug --stacktrace
-
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
