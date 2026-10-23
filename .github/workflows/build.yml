@@ -9,7 +9,12 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-      - uses: gradle/actions/setup-gradle@v3
+
+      # Gradle 8.7 use korbo - 9.8.1 na
+      - name: Setup Gradle 8.7
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 8.7
 
       - name: Fix Project Structure
         run: |
@@ -17,12 +22,56 @@ jobs:
           mkdir -p app/src/main
           mv MainActivity.kt app/src/main/java/com/example/oceantheme2/ || true
           mv AndroidManifest.xml app/src/main/ || true
-          mv build.gradle.kts app/build.gradle.kts || true
+
+          # Root build file - sudhu plugin declaration, version soho
           cat > build.gradle.kts <<'EOF'
           plugins {
-            id("com.android.application") apply false
-            id("org.jetbrains.kotlin.android") apply false
+              id("com.android.application") version "8.7.3" apply false
+              id("org.jetbrains.kotlin.android") version "2.0.21" apply false
           }
+          EOF
+
+          # App build file - Copilot er ta
+          cat > app/build.gradle.kts <<'EOF'
+          plugins {
+              id("com.android.application")
+              id("org.jetbrains.kotlin.android")
+          }
+          android {
+              namespace = "com.example.oceantheme2"
+              compileSdk = 34
+              defaultConfig {
+                  applicationId = "com.example.oceantheme2"
+                  minSdk = 24
+                  targetSdk = 34
+                  versionCode = 1
+                  versionName = "1.0"
+              }
+              buildTypes {
+                  release {
+                      isMinifyEnabled = false
+                      proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+                  }
+              }
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+              kotlinOptions { jvmTarget = "17" }
+          }
+          dependencies {
+              implementation("androidx.core:core-ktx:1.13.1")
+              implementation("androidx.appcompat:appcompat:1.7.0")
+              implementation("com.google.android.material:material:1.12.0")
+          }
+          EOF
+
+          # Settings file thik kora
+          cat > settings.gradle.kts <<'EOF'
+          pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
+          dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
+          rootProject.name = "OceanTheme2"
+          include(":app")
           EOF
 
       - name: Build Debug APK
